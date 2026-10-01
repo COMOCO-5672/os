@@ -1,0 +1,5 @@
+build/
+iso/boot/kernel.elf
+*.o
+*.iso
+.DS_Store
