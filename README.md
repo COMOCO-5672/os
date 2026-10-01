@@ -130,7 +130,33 @@ VGA 显存（可用 QEMU 监视器 `xp/48xb 0xb8000` 自查）：
    `has a LOAD segment with RWX permissions`。等 W4/W9 有分页时用 `PHDRS`
    拆成 RX / RW 两个段消除。
 
-## 6. 已知边界
+## 6. 注意：`x86_64-elf-gdb` 会带入 `python@3.14`
+
+`x86_64-elf-gdb` 依赖 `python@3.14`。Homebrew 在 link 一个新版 python 时，会把
+**无版本号**的别名（`python3` `pip3` `idle3` `pydoc3` `wheel3` `python3-config`）
+从旧版本抢到新版本 —— 于是系统里原有的 `python3` 会从 3.13 变成 3.14，
+而 3.14 看不到 3.13 用户 site-packages（`~/Library/Python/3.13/...`）里已装的包。
+
+自查：
+
+```bash
+ls -l /opt/homebrew/bin/ | grep -E ' (python3|pip3) '
+python3 -V
+```
+
+修复（保留 3.14 可用，只把无版本号别名还回去）：
+
+```bash
+for n in idle3 pip3 pydoc3 python3 python3-config wheel3; do
+  ln -sfn "../Cellar/python@3.13/3.13.5/bin/$n" "/opt/homebrew/bin/$n"
+done
+```
+
+⚠️ 以后再执行 `brew link python@3.14` 或升级 python，别名会**再次被抢走**。
+
+---
+
+## 7. 已知边界
 
 - 当前是 **32 位保护模式**，C 代码尚未启用（GRUB 交付态即 32 位）
 - `vga_puts` 无滚屏、无光标、无 `\n` 处理 —— 这是 W3 的练习内容
