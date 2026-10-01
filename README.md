@@ -2,7 +2,7 @@
 
 x86-64 裸机操作系统，学习项目。技术栈：C / GNU as / QEMU / GRUB(Multiboot2)。
 
-配套 18 周计划见上级目录 `os-dev-plan.md`。
+配套 18 周计划见 [docs/os-dev-plan.md](docs/os-dev-plan.md)。
 
 ---
 
