@@ -26,13 +26,19 @@ mb2_header_start:
     .long mb2_header_end - mb2_header_start
     .long -(MB2_MAGIC + MB2_ARCH_I386 + (mb2_header_end - mb2_header_start))
 
-    /* 信息请求标签: 向 bootloader 索要 memory map(6) 与 framebuffer(8) */
+    /* 信息请求标签: 告诉 bootloader 我们要哪些 tag
+     *   type=1 (information request), size = 8 + 4*4 = 24
+     * 只请求 memory map(6) / bootloader name(2) / ELF sections(9) / ACPI(15)
+     * 故意不请求 framebuffer(8) —— 那会让 GRUB 去切换显卡模式,
+     * 破坏 BIOS 下的 VGA 文本模式 (W3 还要用 0xB8000) */
     .align 8
     .short 1
     .short 0
-    .long 16
+    .long 24
     .long 6
-    .long 8
+    .long 2
+    .long 9
+    .long 15
 
     /* 结束标签: type=0, flags=0, size=8 */
     .align 8
@@ -50,22 +56,28 @@ _start:
     cli                     /* 中断关闭, 后面由我们自己开 */
     cld                     /* 串口/内存操作正向 */
 
-    /* 1) 清零 .bss —— 栈也在这里面, 此刻还没用它 */
+    /* 1) 先把 magic 挪进 %esi
+     *    坑: 下面的 rep stosb 要用 %eax 清零, 会把 multiboot2 magic 冲掉,
+     *    所以必须先搬走。%esi 与 %ebx 都不受 rep stosb 影响 */
+    movl %eax, %esi             /* esi = 0x36D76289 */
+                                /* ebx = multiboot2 info 指针, 全程不动 */
+
+    /* 2) 清零 .bss —— 栈也在这里面, 此刻还没用它 */
     movl $__bss_start, %edi
     movl $__bss_end, %ecx
     subl %edi, %ecx
     xorl %eax, %eax
     rep stosb
 
-    /* 2) 建立自己的内核栈 */
+    /* 3) 建立自己的内核栈 */
     movl $stack_top, %esp
     movl $stack_top, %ebp
 
-    /* 3) 保存 multiboot2 交付的 magic 与 info 指针 (必须在清 .bss 之后) */
-    movl %eax, mb2_magic
+    /* 4) 存入 .bss (此刻 .bss 已清零, 写入才不会被覆盖) */
+    movl %esi, mb2_magic
     movl %ebx, mb2_info
 
-    /* 4) 初始化串口并输出 */
+    /* 5) 初始化串口并输出 */
     call serial_init
     movl $msg_boot, %esi
     call serial_puts

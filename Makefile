@@ -22,8 +22,19 @@ KERNEL  := $(BUILD)/kernel.elf
 ISO     := $(BUILD)/os.iso
 ISO_DIR := iso
 
-# 交叉版 grub-mkrescue 优先, 退化为宿主版
-GRUB_MKRESCUE ?= $(shell command -v $(CROSS)grub-mkrescue 2>/dev/null || command -v grub-mkrescue 2>/dev/null)
+# ---- 引导平台 ----
+#   bios : i686-elf-grub-mkrescue (i386-pc 平台) —— 保留 VGA 文本模式, 推荐
+#   uefi : x86_64-elf-grub-mkrescue (只有 EFI 平台) —— 无 0xB8000 文本模式
+GRUB_PLATFORM ?= bios
+QEMU_SHARE    := $(shell brew --prefix qemu 2>/dev/null)/share/qemu
+
+ifeq ($(GRUB_PLATFORM),bios)
+  GRUB_MKRESCUE ?= $(shell command -v i686-elf-grub-mkrescue 2>/dev/null || command -v grub-mkrescue 2>/dev/null)
+  QEMU_FW       :=
+else
+  GRUB_MKRESCUE ?= $(shell command -v x86_64-elf-grub-mkrescue 2>/dev/null || command -v grub-mkrescue 2>/dev/null)
+  QEMU_FW       := -drive if=pflash,format=raw,readonly=on,file=$(QEMU_SHARE)/edk2-x86_64-code.fd
+endif
 
 # ---- 编译/链接参数 ----
 ifeq ($(BITS),32)
@@ -85,15 +96,15 @@ iso: $(ISO)
 
 # ---------------- 运行 ----------------
 run: $(ISO)
-	$(QEMU) -cdrom $(ISO) -m 512M -no-reboot -no-shutdown -serial stdio
+	$(QEMU) -cdrom $(ISO) -m 512M -no-reboot -no-shutdown -serial stdio $(QEMU_FW)
 
 # 无窗口模式: 只看串口日志, 适合快速回归
 run-headless: $(ISO)
-	$(QEMU) -cdrom $(ISO) -m 512M -no-reboot -no-shutdown -display none -serial stdio
+	$(QEMU) -cdrom $(ISO) -m 512M -no-reboot -no-shutdown -display none -serial stdio $(QEMU_FW)
 
 # 调试: 暂停等待 GDB 连接 (端口 1234)
 debug: $(ISO)
-	$(QEMU) -cdrom $(ISO) -m 512M -no-reboot -no-shutdown -serial stdio -s -S
+	$(QEMU) -cdrom $(ISO) -m 512M -no-reboot -no-shutdown -serial stdio -s -S $(QEMU_FW)
 
 # ---------------- 自检 ----------------
 check:
